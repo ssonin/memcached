@@ -1,7 +1,14 @@
 (ns ssonin.memcached.core
   (:gen-class)
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [clojure.tools.cli :as cli])
   (:import [java.net ServerSocket SocketException]))
+
+(def cli-options
+  [["-p" "--port PORT" "Port number"
+    :default 11211
+    :parse-fn #(Integer/parseInt %)
+    :validate [#(< 0 % 65536) "Must be a number between 0 and 65536"]]])
 
 (defn- echo-client
   [client-socket]
@@ -15,10 +22,10 @@
     (catch SocketException e
       (.println System/err (str "Client disconnected abruptly: " (.getMessage e))))))
 
-(defn -main
-  [& args]
-  (let [socket (ServerSocket. 11211)]
-    (println "Started server on port 11211")
+(defn- start
+  [port]
+  (let [socket (ServerSocket. port)]
+    (println "Started server on port" port)
     (while true
       (try
         (let [client-socket (.accept socket)]
@@ -32,3 +39,14 @@
                           (str "Unexpected error handling client: " (.getMessage e)))))))
         (catch Exception e
           (.println System/err (str "Server error: " (.getMessage e))))))))
+
+(defn -main
+  [& args]
+  (let [{:keys [options errors]} (cli/parse-opts args cli-options)]
+    (cond
+      errors
+      (doseq [error errors]
+        (println "Error:" error)
+        (System/exit 1))
+      :else
+      (start (:port options)))))
